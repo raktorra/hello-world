@@ -2,7 +2,7 @@ import httpx
 from .base import AIProvider
 
 _BASE = "http://localhost:11434"
-_MODEL = "llava"
+_MODEL = "llava:7b-v1.6"
 
 
 class OllamaProvider(AIProvider):
