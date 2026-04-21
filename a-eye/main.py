@@ -2,6 +2,7 @@ import sys
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QPoint
 import key_store
+from providers.ollama import OllamaProvider
 from overlay import OverlayWindow
 from capture import CaptureThread
 from chat_panel import ChatPanel
@@ -14,20 +15,19 @@ def main():
 
     overlay = OverlayWindow()
     capture = CaptureThread(overlay, interval_ms=3000)
-
     chat = ChatPanel(overlay, capture)
 
-    # Position chat panel to the right of the overlay
     overlay.move(200, 200)
-    overlay_right = overlay.x() + overlay.width() + 12
-    chat.move(QPoint(overlay_right, overlay.y()))
+    chat.move(QPoint(overlay.x() + overlay.width() + 12, overlay.y()))
 
     overlay.show()
     chat.show()
 
-    # Open settings on first run if no keys are saved
-    if not any(key_store.load_key(p) for p in ["claude", "chatgpt", "gemini", "grok"]):
-        dlg = SettingsDialog()
+    ollama_ready = OllamaProvider().test_connection()
+    has_api_key = any(key_store.load_key(p) for p in ["claude", "chatgpt", "gemini", "grok"])
+
+    if not ollama_ready and not has_api_key:
+        dlg = SettingsDialog(focus_ollama=True)
         dlg.exec()
         chat._refresh_providers()
         chat._on_provider_changed(chat._provider_combo.currentText())

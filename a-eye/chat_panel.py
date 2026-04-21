@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 import key_store
+from providers.ollama import OllamaProvider
 from providers.claude import ClaudeProvider
 from providers.chatgpt import ChatGPTProvider
 from providers.gemini import GeminiProvider
@@ -11,7 +12,7 @@ from providers.grok import GrokProvider
 from settings_dialog import SettingsDialog
 
 
-_PROVIDER_CLASSES = {
+_API_PROVIDER_CLASSES = {
     "Claude": ClaudeProvider,
     "ChatGPT": ChatGPTProvider,
     "Gemini": GeminiProvider,
@@ -23,6 +24,7 @@ _KEY_IDS = {
     "Gemini": "gemini",
     "Grok": "grok",
 }
+_OLLAMA_NAME = "Ollama (local)"
 
 
 class _AIWorker(QThread):
@@ -62,7 +64,6 @@ class ChatPanel(QWidget):
         self.setMinimumWidth(320)
         layout = QVBoxLayout(self)
 
-        # Top bar: provider selector + settings button
         top = QHBoxLayout()
         top.addWidget(QLabel("AI:"))
         self._provider_combo = QComboBox()
@@ -75,7 +76,6 @@ class ChatPanel(QWidget):
         top.addWidget(settings_btn)
         layout.addLayout(top)
 
-        # Interval slider
         slider_row = QHBoxLayout()
         slider_row.addWidget(QLabel("Interval:"))
         self._slider = QSlider(Qt.Orientation.Horizontal)
@@ -89,12 +89,10 @@ class ChatPanel(QWidget):
         slider_row.addWidget(self._slider_label)
         layout.addLayout(slider_row)
 
-        # Chat history
         self._history = QTextEdit()
         self._history.setReadOnly(True)
         layout.addWidget(self._history, 1)
 
-        # Input row
         input_row = QHBoxLayout()
         self._input = QLineEdit()
         self._input.setPlaceholderText("Ask the AI something...")
@@ -110,20 +108,27 @@ class ChatPanel(QWidget):
     def _refresh_providers(self):
         self._provider_combo.blockSignals(True)
         self._provider_combo.clear()
+
+        # Ollama first — no key needed, just check if it's running
+        if OllamaProvider().test_connection():
+            self._provider_combo.addItem(_OLLAMA_NAME)
+
+        # API-key providers
         for name, key_id in _KEY_IDS.items():
             if key_store.load_key(key_id):
                 self._provider_combo.addItem(name)
+
         if self._provider_combo.count() == 0:
-            self._provider_combo.addItem("(No keys saved — open ⚙)")
+            self._provider_combo.addItem("(None — open ⚙ to set up)")
+
         self._provider_combo.blockSignals(False)
 
     def _on_provider_changed(self, name: str):
-        if name not in _PROVIDER_CLASSES:
-            self._provider = None
-            return
-        key = key_store.load_key(_KEY_IDS[name])
-        if key:
-            self._provider = _PROVIDER_CLASSES[name](key)
+        if name == _OLLAMA_NAME:
+            self._provider = OllamaProvider()
+        elif name in _API_PROVIDER_CLASSES:
+            key = key_store.load_key(_KEY_IDS[name])
+            self._provider = _API_PROVIDER_CLASSES[name](key) if key else None
         else:
             self._provider = None
 

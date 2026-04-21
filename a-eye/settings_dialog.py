@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 import key_store
+from providers.ollama import OllamaProvider
 from providers.claude import ClaudeProvider
 from providers.chatgpt import ChatGPTProvider
 from providers.gemini import GeminiProvider
@@ -56,25 +57,65 @@ _DISPLAY_NAMES = {
     "grok": "Grok (xAI)",
 }
 
+_OLLAMA_INSTRUCTIONS = (
+    "Ollama runs an AI model locally on your PC — no account or internet needed.\n\n"
+    "Setup (one-time):\n"
+    "  1. Download and install Ollama from ollama.com\n"
+    "  2. Open Command Prompt and run:\n"
+    "         ollama pull llava\n"
+    "  3. Wait for the download to finish (~4 GB)\n"
+    "  4. Click 'Check Again' below — status should turn green\n\n"
+    "Minimum requirements: 8 GB RAM, modern CPU (GPU optional but faster)"
+)
+
 
 class SettingsDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, focus_ollama: bool = False):
         super().__init__(parent)
         self.setWindowTitle("A-Eye Settings")
-        self.setMinimumWidth(480)
+        self.setMinimumWidth(500)
         self._fields: dict[str, QLineEdit] = {}
+        self._ollama_status_label: QLabel | None = None
+        self._tabs: QTabWidget | None = None
         self._build_ui()
         self._load_saved_keys()
+        self._refresh_ollama_status()
+        if focus_ollama and self._tabs:
+            self._tabs.setCurrentIndex(0)
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        tabs = QTabWidget()
+        self._tabs = QTabWidget()
 
+        # --- Ollama tab (first) ---
+        ollama_tab = QWidget()
+        ot_layout = QVBoxLayout(ollama_tab)
+        ot_layout.setSpacing(10)
+        ot_layout.addWidget(QLabel("<b>Ollama — Free Local AI (Recommended)</b>"))
+
+        status_row = QHBoxLayout()
+        self._ollama_status_label = QLabel("Checking...")
+        check_btn = QPushButton("Check Again")
+        check_btn.setFixedWidth(100)
+        check_btn.clicked.connect(self._refresh_ollama_status)
+        status_row.addWidget(QLabel("Status:"))
+        status_row.addWidget(self._ollama_status_label)
+        status_row.addStretch()
+        status_row.addWidget(check_btn)
+        ot_layout.addLayout(status_row)
+
+        instructions = QLabel(_OLLAMA_INSTRUCTIONS)
+        instructions.setWordWrap(True)
+        instructions.setStyleSheet("background:#f5f5f5; padding:10px; border-radius:4px;")
+        ot_layout.addWidget(instructions)
+        ot_layout.addStretch()
+        self._tabs.addTab(ollama_tab, "Ollama (Free)")
+
+        # --- API key tabs ---
         for provider_id, display_name in _DISPLAY_NAMES.items():
             tab = QWidget()
             tab_layout = QVBoxLayout(tab)
             tab_layout.setSpacing(8)
-
             tab_layout.addWidget(QLabel(f"<b>{display_name}</b>"))
 
             key_row = QHBoxLayout()
@@ -100,9 +141,7 @@ class SettingsDialog(QDialog):
             key_row.addWidget(test_btn)
             tab_layout.addLayout(key_row)
 
-            help_label = QLabel(
-                f'<a href="#">How to get this key ▼</a>'
-            )
+            help_label = QLabel('<a href="#">How to get this key ▼</a>')
             help_label.setTextFormat(Qt.TextFormat.RichText)
             instructions_label = QLabel(_INSTRUCTIONS[provider_id])
             instructions_label.setWordWrap(True)
@@ -119,13 +158,22 @@ class SettingsDialog(QDialog):
             tab_layout.addWidget(help_label)
             tab_layout.addWidget(instructions_label)
             tab_layout.addStretch()
-            tabs.addTab(tab, display_name.split(" ")[0])
+            self._tabs.addTab(tab, display_name.split(" ")[0])
 
-        layout.addWidget(tabs)
+        layout.addWidget(self._tabs)
 
         save_btn = QPushButton("Save")
         save_btn.clicked.connect(self._save)
         layout.addWidget(save_btn)
+
+    def _refresh_ollama_status(self):
+        ok = OllamaProvider().test_connection()
+        if ok:
+            self._ollama_status_label.setText("✓ Running — llava model ready")
+            self._ollama_status_label.setStyleSheet("color: green; font-weight: bold;")
+        else:
+            self._ollama_status_label.setText("✗ Not detected")
+            self._ollama_status_label.setStyleSheet("color: red; font-weight: bold;")
 
     def _load_saved_keys(self):
         for provider_id, field in self._fields.items():
@@ -138,14 +186,13 @@ class SettingsDialog(QDialog):
             return
         cls = _PROVIDER_CLASSES[provider_id]
         try:
-            provider = cls(key)
-            ok = provider.test_connection()
+            ok = cls(key).test_connection()
         except Exception:
             ok = False
         if ok:
             QMessageBox.information(self, "Connected", f"{_DISPLAY_NAMES[provider_id]}: connected successfully!")
         else:
-            QMessageBox.critical(self, "Failed", f"Could not connect. Check your API key and try again.")
+            QMessageBox.critical(self, "Failed", "Could not connect. Check your API key and try again.")
 
     def _save(self):
         for provider_id, field in self._fields.items():
