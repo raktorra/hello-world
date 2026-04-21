@@ -2,6 +2,7 @@ import sys
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QPoint
 import key_store
+import theme
 from providers.ollama import OllamaProvider
 from overlay import OverlayWindow
 from capture import CaptureThread
@@ -12,6 +13,7 @@ from settings_dialog import SettingsDialog
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("A-Eye")
+    app.setStyleSheet(theme.DARK_STYLE)
 
     overlay = OverlayWindow()
     capture = CaptureThread(overlay, interval_ms=3000)

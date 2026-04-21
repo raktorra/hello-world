@@ -152,8 +152,9 @@ class ChatPanel(QWidget):
             return
         self._input.clear()
         self._messages.append({"role": "user", "content": text})
-        self._append_bubble("You", text, "#DCF8C6")
+        self._append_bubble("You", text, "#1a3a2a", "#88cc88")
 
+        self._append_bubble("A-Eye", "Thinking...", "#2d2d2d", "#888888")
         self._capture_thread.set_paused(True)
         self._worker = _AIWorker(self._provider, self._messages, self._latest_frame)
         self._worker.reply_ready.connect(self._on_reply)
@@ -164,14 +165,15 @@ class ChatPanel(QWidget):
     def _on_reply(self, text: str):
         self._messages.append({"role": "assistant", "content": text})
         name = self._provider_combo.currentText()
-        self._append_bubble(name, text, "#F0F0F0")
+        self._append_bubble(name, text, "#2a3a4a", "#a8d4ff")
 
     def _on_error(self, msg: str):
-        self._append_bubble("Error", msg, "#FFD0D0")
+        self._append_bubble("Error", msg, "#4a1e1e", "#ff9999")
 
-    def _append_bubble(self, sender: str, text: str, color: str):
+    def _append_bubble(self, sender: str, text: str, bg: str, sender_color: str = "#4A9FFF"):
         self._history.append(
-            f'<div style="background:{color};padding:6px;border-radius:6px;margin:4px 0;">'
-            f'<b>{sender}:</b> {text.replace(chr(10), "<br>")}'
+            f'<div style="background:{bg};padding:8px;border-radius:6px;margin:4px 0;">'
+            f'<b style="color:{sender_color};">{sender}:</b> '
+            f'<span style="color:#e8e8e8;">{text.replace(chr(10), "<br>")}</span>'
             f'</div>'
         )

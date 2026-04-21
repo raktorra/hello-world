@@ -25,7 +25,7 @@ class OllamaProvider(AIProvider):
         response = httpx.post(
             f"{_BASE}/v1/chat/completions",
             json={"model": _MODEL, "messages": formatted},
-            timeout=60,
+            timeout=180,
         )
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
