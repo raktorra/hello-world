@@ -34,8 +34,10 @@ class CaptureThread(QThread):
                         monitor = {"left": x, "top": y, "width": w, "height": h}
                         shot = sct.grab(monitor)
                         img = Image.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
+                        # Resize to max 768px on longest side — large images confuse vision models
+                        img.thumbnail((768, 768), Image.LANCZOS)
                         buf = io.BytesIO()
-                        img.save(buf, format="PNG")
+                        img.save(buf, format="JPEG", quality=85)
                         b64 = base64.b64encode(buf.getvalue()).decode()
                         self.frame_ready.emit(b64)
                 self.msleep(self._interval_ms)

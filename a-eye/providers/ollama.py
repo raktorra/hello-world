@@ -9,7 +9,6 @@ class OllamaProvider(AIProvider):
     name = "Ollama (local)"
 
     def send(self, messages: list[dict], image_b64: str | None) -> str:
-        # Use Ollama's native /api/chat — better vision support than the OpenAI-compat endpoint
         ollama_messages = []
         for msg in messages[:-1]:
             ollama_messages.append({"role": msg["role"], "content": msg["content"]})
@@ -26,7 +25,20 @@ class OllamaProvider(AIProvider):
             timeout=180,
         )
         response.raise_for_status()
-        return response.json()["message"]["content"]
+        result = response.json()["message"]["content"]
+
+        # If the model returns garbled output (contains special tokens), retry without image
+        if image_b64 and ("<unk>" in result or result.count("�") > 5):
+            entry.pop("images", None)
+            response = httpx.post(
+                f"{_BASE}/api/chat",
+                json={"model": _MODEL, "messages": ollama_messages, "stream": False},
+                timeout=180,
+            )
+            response.raise_for_status()
+            result = response.json()["message"]["content"]
+
+        return result
 
     def test_connection(self) -> bool:
         try:
