@@ -99,9 +99,20 @@ class ChatPanel(QWidget):
         self._input = QLineEdit()
         self._input.setPlaceholderText("Ask the AI something...")
         self._input.returnPressed.connect(self._send)
+        self._screen_btn = QPushButton("📷")
+        self._screen_btn.setFixedWidth(36)
+        self._screen_btn.setCheckable(True)
+        self._screen_btn.setChecked(False)
+        self._screen_btn.setToolTip("Include screenshot with message")
+        self._screen_btn.toggled.connect(
+            lambda on: self._screen_btn.setStyleSheet(
+                "background:#1a4a6a; border:1px solid #4A9FFF;" if on else ""
+            )
+        )
         send_btn = QPushButton("Send")
         send_btn.clicked.connect(self._send)
         input_row.addWidget(self._input, 1)
+        input_row.addWidget(self._screen_btn)
         input_row.addWidget(send_btn)
         layout.addLayout(input_row)
 
@@ -156,10 +167,11 @@ class ChatPanel(QWidget):
         self._messages.append({"role": "user", "content": text})
         self._append_bubble("You", text, "#1a3a2a", "#88cc88")
 
+        image = self._latest_frame if self._screen_btn.isChecked() else None
         self._thinking_shown = True
         self._append_bubble("A-Eye", "Thinking...", "#2d2d2d", "#888888")
         self._capture_thread.set_paused(True)
-        self._worker = _AIWorker(self._provider, self._messages, self._latest_frame)
+        self._worker = _AIWorker(self._provider, self._messages, image)
         self._worker.reply_ready.connect(self._on_reply)
         self._worker.error.connect(self._on_error)
         self._worker.finished.connect(lambda: self._capture_thread.set_paused(False))
