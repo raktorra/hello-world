@@ -9,12 +9,8 @@ class OllamaProvider(AIProvider):
     name = "Ollama (local)"
 
     def send(self, messages: list[dict], image_b64: str | None) -> str:
-        # Build a simple prompt string from message history
-        prompt = ""
-        for msg in messages:
-            role = "User" if msg["role"] == "user" else "Assistant"
-            prompt += f"{role}: {msg['content']}\n"
-        prompt += "Assistant:"
+        # Send just the raw prompt text — Ollama applies the model's own template internally
+        prompt = messages[-1]["content"]
 
         payload = {
             "model": _MODEL,
