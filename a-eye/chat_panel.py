@@ -1,8 +1,10 @@
+import html as _html
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QLineEdit,
     QPushButton, QComboBox, QLabel, QSlider
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QTextCursor
 import key_store
 from providers.ollama import OllamaProvider
 from providers.claude import ClaudeProvider
@@ -154,6 +156,7 @@ class ChatPanel(QWidget):
         self._messages.append({"role": "user", "content": text})
         self._append_bubble("You", text, "#1a3a2a", "#88cc88")
 
+        self._thinking_shown = True
         self._append_bubble("A-Eye", "Thinking...", "#2d2d2d", "#888888")
         self._capture_thread.set_paused(True)
         self._worker = _AIWorker(self._provider, self._messages, self._latest_frame)
@@ -162,18 +165,37 @@ class ChatPanel(QWidget):
         self._worker.finished.connect(lambda: self._capture_thread.set_paused(False))
         self._worker.start()
 
+    def _remove_thinking(self):
+        if getattr(self, "_thinking_shown", False):
+            cursor = self._history.textCursor()
+            cursor.movePosition(QTextCursor.MoveOperation.End)
+            cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+            # Remove the entire last block (the Thinking... div)
+            doc = self._history.document()
+            block = doc.lastBlock()
+            cursor.setPosition(block.position())
+            cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
+            cursor.movePosition(QTextCursor.MoveOperation.PreviousBlock)
+            cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock)
+            cursor.movePosition(QTextCursor.MoveOperation.End, QTextCursor.MoveMode.KeepAnchor)
+            cursor.removeSelectedText()
+            self._thinking_shown = False
+
     def _on_reply(self, text: str):
         self._messages.append({"role": "assistant", "content": text})
+        self._remove_thinking()
         name = self._provider_combo.currentText()
         self._append_bubble(name, text, "#2a3a4a", "#a8d4ff")
 
     def _on_error(self, msg: str):
+        self._remove_thinking()
         self._append_bubble("Error", msg, "#4a1e1e", "#ff9999")
 
     def _append_bubble(self, sender: str, text: str, bg: str, sender_color: str = "#4A9FFF"):
+        safe_text = _html.escape(text).replace("\n", "<br>")
         self._history.append(
             f'<div style="background:{bg};padding:8px;border-radius:6px;margin:4px 0;">'
             f'<b style="color:{sender_color};">{sender}:</b> '
-            f'<span style="color:#e8e8e8;">{text.replace(chr(10), "<br>")}</span>'
+            f'<span style="color:#e8e8e8;">{safe_text}</span>'
             f'</div>'
         )
